@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber 零用錢管理</title>
+    <style>
+        /* --- 全局樣式與 Cyber 主題 --- */
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap');
+        :root {
+            --bg-color: #0d0d1a; --primary-color: #0a0a14; --accent-color: #00f7ff;
+            --glow-color: rgba(0, 247, 255, 0.7); --text-color: #e0e0e0; --danger-color: #ff4d88;
+            --success-color: #00ff8c; --card-bg: #1a1a2e;
+        }
+        body {
+            background-color: var(--bg-color); color: var(--text-color); font-family: 'Noto Sans TC', 'Orbitron', sans-serif;
+            margin: 0; padding: 1rem; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh;
+        }
+        #app-container {
+            width: 100%; max-width: 800px; background-color: var(--primary-color); border-radius: 10px;
+            border: 1px solid var(--accent-color); box-shadow: 0 0 25px var(--glow-color); padding: 1.5rem; box-sizing: border-box;
+        }
+        .hidden { display: none !important; }
+        h1, h2, h3, h4 { font-family: 'Orbitron', sans-serif; color: var(--accent-color); text-shadow: 0 0 5px var(--glow-color); text-align: center; }
+        hr { border-color: var(--accent-color); opacity: 0.5; margin: 2rem 0; }
+        .input-group { margin-bottom: 1rem; }
+        .input-group label { display: block; margin-bottom: 0.5rem; color: var(--accent-color); }
+        input, select, button { width: 100%; padding: 0.8rem; background-color: var(--card-bg); border: 1px solid var(--accent-color); border-radius: 5px; color: var(--text-color); font-size: 1rem; box-sizing: border-box; transition: all 0.3s ease; }
+        input:focus, select:focus { outline: none; box-shadow: 0 0 10px var(--glow-color); }
+        input[type="date"] { color-scheme: dark; }
+        button { cursor: pointer; background-color: var(--accent-color); color: var(--primary-color); font-weight: bold; border: none; }
+        button:hover { box-shadow: 0 0 15px var(--glow-color); transform: translateY(-2px); }
+        button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+        button.danger { background-color: var(--danger-color); }
+        button.success { background-color: var(--success-color); }
+        button.secondary { background-color: transparent; color: var(--accent-color); border: 1px solid var(--accent-color); }
+        button.active-filter { background-color: var(--success-color); color: var(--primary-color); box-shadow: 0 0 10px var(--success-color); }
+        .user-card { background-color: var(--card-bg); padding: 1rem; border-radius: 8px; border-left: 5px solid var(--accent-color); margin-bottom: 1rem; cursor: pointer; text-align: center; transition: all 0.3s ease; }
+        .user-card:hover { transform: scale(1.03); box-shadow: 0 0 10px var(--glow-color); }
+        .user-card.parent { border-left-color: var(--success-color); } .user-card.child { border-left-color: #ffa500; }
+        .transaction-item { display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center; background-color: var(--card-bg); padding: 1rem; border-radius: 5px; margin-bottom: 0.5rem; border-left: 4px solid var(--accent-color); }
+        .transaction-item.income { border-left-color: var(--success-color); } .transaction-item.expense { border-left-color: var(--danger-color); }
+        .transaction-item .details { display: flex; flex-direction: column; gap: 0.25rem; }
+        .transaction-item .side-info { text-align: right; }
+        .transaction-item .amount { font-weight: bold; font-size: 1.1rem; }
+        .income .amount { color: var(--success-color); } .expense .amount { color: var(--danger-color); }
+        .transaction-item .actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; justify-content: flex-end; }
+        .transaction-item .actions button { padding: 0.4rem; font-size: 0.8rem; width: auto; min-width: 60px; }
+        .balance-display { background: linear-gradient(45deg, var(--accent-color), var(--success-color)); color: var(--primary-color); padding: 1.5rem; border-radius: 10px; text-align: center; margin-bottom: 1.5rem; }
+        .balance-display h3 { color: var(--primary-color); text-shadow: none;}
+        .balance-display .amount { font-size: 2.5rem; font-weight: bold; }
+        .filter-controls { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .filter-controls button { flex-grow: 1; }
+        .dynamic-filters { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .summary-box { background-color: var(--card-bg); border: 1px solid var(--accent-color); padding: 1rem; margin-bottom: 1.5rem; border-radius: 8px; text-align: center; }
+        .summary-box h4 { margin-top: 0; }
+        .summary-box .details { display: flex; justify-content: space-around; font-size: 1.2rem; }
+        .summary-box .income { color: var(--success-color); } .summary-box .expense { color: var(--danger-color); }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background-color: var(--primary-color); padding: 2rem; border-radius: 10px; border: 1px solid var(--accent-color); box-shadow: 0 0 25px var(--glow-color); width: 90%; max-width: 500px; }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <!-- 登入畫面 -->
+        <div id="login-view">
+            <h1 id="main-app-title">Cyber 零用錢管理</h1>
+            <div id="user-selection"></div>
+            <div id="password-prompt" class="hidden input-group">
+                <label for="password-input">請輸入密碼</label>
+                <input type="password" id="password-input" placeholder="輸入密碼" onkeyup="app.handleLoginKey(event)">
+                <button onclick="app.login()" style="margin-top: 1rem;">登入</button>
+            </div>
+        </div>
+
+        <!-- 管理員畫面 -->
+        <div id="admin-view" class="hidden">
+            <h2>管理員控制台</h2><button onclick="app.logout()">返回主頁</button><hr>
+            <h4>帳戶管理</h4>
+            <div class="input-group"><label for="parent-name">新增家長姓名</label><input type="text" id="parent-name" placeholder="例如: 爸爸"></div>
+            <div class="input-group"><label for="parent-password-setup">新增家長密碼</label><input type="text" id="parent-password-setup" placeholder="設定家長登入密碼"></div>
+            <button onclick="app.createAccount('parent')">建立家長帳戶</button>
+            <h4 style="margin-top:2rem;">現有家長帳戶</h4><div id="admin-parents-list"></div><hr>
+            <h4>系統設定</h4>
+            <div class="input-group"><label for="app-name-input">更改程式名稱</label><input type="text" id="app-name-input"></div>
+            <div class="input-group"><label for="admin-password">更改管理員密碼</label><input type="password" id="admin-password" placeholder="輸入新密碼"></div>
+            <button onclick="app.saveAdminSettings()">儲存設定</button><hr>
+            <button class="danger" onclick="app.resetAllData()">!!! 重設所有數據 !!!</button>
+        </div>
+
+        <!-- 家長畫面 -->
+        <div id="parent-view" class="hidden">
+            <h2 id="parent-welcome">家長控制台</h2><button onclick="app.logout()">返回主頁</button><hr>
+            <h3>小朋友帳戶管理</h3>
+            <div class="input-group"><label for="child-name">小朋友姓名</label><input type="text" id="child-name" placeholder="例如: 陳小明"></div>
+            <div class="input-group"><label for="child-password">小朋友密碼</label><input type="text" id="child-password" placeholder="設定小朋友登入密碼"></div>
+            <button onclick="app.createAccount('child')">建立小朋友帳戶</button>
+            <h4 style="margin-top:2rem;">現有小朋友帳戶</h4><div id="parent-children-list"></div><hr>
+            <h3>零用錢記錄管理</h3>
+            <div class="input-group">
+                <label for="parent-child-select">選擇要查看的小朋友</label>
+                <select id="parent-child-select" onchange="app.handleChildSelectionChange('parent')"><option value="">-- 請選擇 --</option></select>
+            </div>
+            <div id="parent-tx-view-content" class="hidden">
+                <div id="parent-filter-container"></div>
+                <div id="parent-summary-container"></div>
+                <button class="success" onclick="app.showTransactionModal('income')">增加零用錢</button>
+                <button class="danger" onclick="app.showTransactionModal('expense')" style="margin-top: 0.5rem;">扣減零用錢</button>
+                <button class="secondary" onclick="document.getElementById('csv-importer').click()" style="margin-top: 1rem;">導入 CSV</button>
+                <input type="file" id="csv-importer" class="hidden" accept=".csv" onchange="app.importCSV(event)">
+                <button class="secondary" onclick="app.exportCSV()" style="margin-top: 0.5rem;">導出 CSV</button>
+                <h4 style="margin-top: 2rem;">交易記錄</h4><div id="parent-transaction-list"></div>
+            </div><hr>
+            <h3>數據與設定</h3>
+            <div class="input-group"><label for="daily-allowance">每日可領取零用錢金額</label><input type="number" id="daily-allowance" placeholder="例如: 10"></div>
+            <button onclick="app.saveParentSettings()">儲存設定</button>
+        </div>
+
+        <!-- 小朋友主畫面 -->
+        <div id="child-view" class="hidden">
+            <h2 id="child-welcome">你好！</h2><button onclick="app.logout()">返回主頁</button>
+            <div class="balance-display"><h3>我的總結餘</h3><div id="child-balance" class="amount">$0</div></div>
+            <button id="claim-allowance-btn" class="success" onclick="app.claimDailyAllowance()" style="padding: 1.5rem; font-size: 1.2rem;"></button><hr>
+            <h3>我的記錄</h3>
+            <div id="child-filter-container"></div>
+            <div id="child-summary-container"></div>
+            <div id="child-transaction-list"></div>
+        </div>
+        
+        <!-- 交易彈出式視窗 -->
+        <div id="transaction-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="modal-title">新增事項</h3>
+                <div class="input-group"><label for="tx-date">日期</label><input type="date" id="tx-date"></div>
+                <div class="input-group"><label for="tx-description">事件名稱</label><input type="text" id="tx-description" placeholder="例如: 幫手做家務"></div>
+                <div class="input-group"><label for="tx-amount">金額</label><input type="number" id="tx-amount" placeholder="例如: 5"></div>
+                <input type="hidden" id="tx-type"><input type="hidden" id="tx-id-to-edit">
+                <button id="save-tx-btn" onclick="app.saveTransaction()">儲存</button>
+                <button class="secondary" onclick="app.closeTransactionModal()" style="margin-top: 0.5rem;">取消</button>
+            </div>
+        </div>
+
+        <!-- 範本 -->
+        <template id="filter-controls-template">
+            <div class="filter-controls">
+                <button data-mode="all" onclick="app.setFilterMode(this, 'all')">所有記錄</button>
+                <button data-mode="year" onclick="app.setFilterMode(this, 'year')">按年查看</button>
+                <button data-mode="month" onclick="app.setFilterMode(this, 'month')">按月查看</button>
+            </div>
+            <div class="dynamic-filters"></div>
+        </template>
+    </div>
+
+<script>
+const app = {
+    state: {
+        accounts: [],
+        transactions: [],
+        settings: {
+            adminPassword: 'Admin',
+            dailyAllowance: 10,
+            appName: 'Cyber 零用錢管理'
+        },
+        currentLogin: { type: null, accountId: null, viewingChildId: null, filter: { mode: 'all' } }
+    },
+
+    // --- 核心應用程式流程 ---
+    init() {
+        this.loadData();
+        this.renderAppName();
+        this.logout();
+    },
+
+    logout() { 
+        this.state.currentLogin = { type: null, accountId: null, viewingChildId: null, filter: { mode: 'all' } };
+        this.showView('login-view'); 
+    },
+
+    login() {
+        const password = document.getElementById('password-input').value;
+        const { type, accountId } = this.state.currentLogin;
+        let success = false;
+        if (type === 'admin' && password === this.state.settings.adminPassword) {
+            this.renderAdminView();
+            success = true;
+        } else if (type === 'parent' || type === 'child') {
+            const account = this.getAccount(accountId);
+            if (account && password === account.password) {
+                if (type === 'parent') this.renderParentView(accountId);
+                else this.renderChildView(accountId);
+                success = true;
+            }
+        }
+        if (!success) alert('密碼錯誤！');
+    },
+
+    handleLoginKey(event) {
+        if (event.key === 'Enter') {
+            this.login();
+        }
+    },
+
+    // --- 數據儲存 ---
+    saveData() {
+        localStorage.setItem('pocketMoneyDataV10', JSON.stringify(this.state));
+    },
+
+    loadData() {
+        const data = localStorage.getItem('pocketMoneyDataV10');
+        const defaultState = {
+            accounts: [], transactions: [],
+            settings: { adminPassword: 'Admin', dailyAllowance: 10, appName: 'Cyber 零用錢管理' },
+            currentLogin: { type: null, accountId: null, viewingChildId: null, filter: { mode: 'all' } }
+        };
+        this.state = data ? { ...defaultState, ...JSON.parse(data) } : defaultState;
+        this.state.settings = { ...defaultState.settings, ...(this.state.settings || {}) };
+        this.state.currentLogin = { ...defaultState.currentLogin, ...(this.state.currentLogin || {}) };
+    },
+
+    // --- 畫面切換與渲染 ---
+    showView(viewId) {
+        document.querySelectorAll('#app-container > div[id$="-view"]').forEach(div => div.classList.add('hidden'));
+        const view = document.getElementById(viewId);
+        if(view) view.classList.remove('hidden');
+        if (viewId === 'login-view') {
+            this.renderLoginScreen();
+        }
+    },
+    
+    renderAppName() {
+        document.title = this.state.settings.appName;
+        const titleElement = document.getElementById('main-app-title');
+        if (titleElement) {
+            titleElement.innerText = this.state.settings.appName;
+        }
+    },
+
+    renderLoginScreen() {
+        const selectionDiv = document.getElementById('user-selection');
+        selectionDiv.innerHTML = '';
+        const adminCard = this.createEle('div', { className: 'user-card', innerText: '管理員登入', onclick: () => this.promptPassword('admin') });
+        selectionDiv.appendChild(adminCard);
+        this.state.accounts.forEach(acc => {
+            const card = this.createEle('div', { 
+                className: `user-card ${acc.role}`, 
+                innerText: acc.name + (acc.role === 'parent' ? ' (家長)' : ' (小朋友)'),
+                onclick: () => this.promptPassword(acc.role, acc.id) 
+            });
+            selectionDiv.appendChild(card);
+        });
+        document.getElementById('password-prompt').classList.add('hidden');
+    },
+
+    promptPassword(type, accountId = null) {
+        this.state.currentLogin = { ...this.state.currentLogin, type, accountId };
+        const promptDiv = document.getElementById('password-prompt');
+        promptDiv.classList.remove('hidden');
+        document.getElementById('password-input').value = '';
+        document.getElementById('password-input').focus();
+    },
+
+    renderAdminView() {
+        this.showView('admin-view');
+        const listDiv = document.getElementById('admin-parents-list');
+        listDiv.innerHTML = '';
+        this.state.accounts.filter(a => a.role === 'parent').forEach(acc => {
+            const accDiv = this.createEle('div', { className: 'transaction-item' });
+            accDiv.innerHTML = `<div class="details"><span>${acc.name}</span></div><div class="side-info"><div class="actions"><button class="danger" onclick="app.deleteAccount(${acc.id})">刪除</button></div></div>`;
+            listDiv.appendChild(accDiv);
+        });
+        document.getElementById('app-name-input').value = this.state.settings.appName;
+        document.getElementById('admin-password').value = '';
+    },
+    
+    renderParentView(accountId) {
+        this.showView('parent-view');
+        document.getElementById('parent-welcome').innerText = `${this.getAccount(accountId).name} 控制台`;
+        const listDiv = document.getElementById('parent-children-list');
+        listDiv.innerHTML = '';
+        this.state.accounts.filter(a => a.role === 'child').forEach(acc => {
+            const accDiv = this.createEle('div', { className: 'transaction-item' });
+            accDiv.innerHTML = `<div class="details"><span>${acc.name}</span></div><div class="side-info"><div class="actions"><button class="danger" onclick="app.deleteAccount(${acc.id})">刪除</button></div></div>`;
+            listDiv.appendChild(accDiv);
+        });
+        const select = document.getElementById('parent-child-select');
+        select.innerHTML = '<option value="">-- 請選擇 --</option>';
+        this.state.accounts.filter(a => a.role === 'child').forEach(acc => {
+            select.appendChild(this.createEle('option', { value: acc.id, innerText: acc.name }));
+        });
+        document.getElementById('parent-tx-view-content').classList.add('hidden');
+        document.getElementById('daily-allowance').value = this.state.settings.dailyAllowance;
+    },
+
+    renderChildView(accountId) {
+        this.showView('child-view');
+        const account = this.getAccount(accountId);
+        if (!account) { this.logout(); return; }
+        document.getElementById('child-welcome').innerText = `你好, ${account.name}!`;
+        const allTxs = this.state.transactions.filter(tx => tx.accountId === accountId);
+        const totalBalance = allTxs.reduce((sum, tx) => sum + tx.amount, 0);
+        document.getElementById('child-balance').innerText = `$${totalBalance.toFixed(2)}`;
+        this.state.currentLogin.filter = { mode: 'all' };
+        this.renderTransactionView('child', accountId);
+        this.updateClaimButtonStatus(accountId);
+    },
+
+    // --- 交易記錄核心功能 (篩選/統計/顯示) ---
+    handleChildSelectionChange(mode) {
+        const childId = parseInt(document.getElementById(`${mode}-child-select`).value);
+        if (childId) {
+            this.state.currentLogin.viewingChildId = childId;
+            this.state.currentLogin.filter = { mode: 'all' };
+            this.renderTransactionView(mode, childId);
+        } else {
+            document.getElementById(`${mode}-tx-view-content`).classList.add('hidden');
+        }
+    },
+    
+    setFilterMode(btn, mode) {
+        this.state.currentLogin.filter = { mode };
+        const viewMode = this.state.currentLogin.type === 'child' ? 'child' : 'parent';
+        const childId = viewMode === 'child' ? this.state.currentLogin.accountId : this.state.currentLogin.viewingChildId;
+        this.renderTransactionView(viewMode, childId);
+    },
+
+    handleFilterChange(type, value) {
+        this.state.currentLogin.filter[type] = value ? parseInt(value) : null;
+        const viewMode = this.state.currentLogin.type === 'child' ? 'child' : 'parent';
+        const childId = viewMode === 'child' ? this.state.currentLogin.accountId : this.state.currentLogin.viewingChildId;
+        this.renderTransactionView(viewMode, childId);
+    },
+
+    renderFilterControls(container, childId) {
+        container.innerHTML = '';
+        const template = document.getElementById('filter-controls-template').content.cloneNode(true);
+        container.appendChild(template);
+        const activeBtn = container.querySelector(`button[data-mode="${this.state.currentLogin.filter.mode}"]`);
+        if (activeBtn) activeBtn.classList.add('active-filter');
+        const dynamicFiltersDiv = container.querySelector('.dynamic-filters');
+        const allTxs = this.state.transactions.filter(tx => tx.accountId === childId);
+        const availableYears = [...new Set(allTxs.map(tx => new Date(tx.date).getFullYear()))].sort((a, b) => b - a);
+        if (this.state.currentLogin.filter.mode === 'year' || this.state.currentLogin.filter.mode === 'month') {
+            const yearSelect = this.createEle('select', { onchange: (e) => this.handleFilterChange('year', e.target.value) });
+            yearSelect.innerHTML = `<option value="">選擇年份</option>`;
+            availableYears.forEach(y => yearSelect.add(new Option(y, y, false, y == this.state.currentLogin.filter.year)));
+            dynamicFiltersDiv.appendChild(yearSelect);
+        }
+        if (this.state.currentLogin.filter.mode === 'month') {
+            const monthSelect = this.createEle('select', { onchange: (e) => this.handleFilterChange('month', e.target.value) });
+            monthSelect.innerHTML = `<option value="">選擇月份</option>`;
+            for (let i = 1; i <= 12; i++) {
+                monthSelect.add(new Option(`${i}月`, i, false, i == this.state.currentLogin.filter.month));
+            }
+            dynamicFiltersDiv.appendChild(monthSelect);
+        }
+    },
+    
+    renderTransactionView(mode, accountId) {
+        const childId = (mode === 'parent') ? accountId : this.state.currentLogin.accountId;
+        if (!childId) return;
+
+        if (mode === 'parent') document.getElementById('parent-tx-view-content').classList.remove('hidden');
+
+        const filterContainer = document.getElementById(`${mode}-filter-container`);
+        const summaryContainer = document.getElementById(`${mode}-summary-container`);
+        const listDiv = document.getElementById(`${mode}-transaction-list`);
+        
+        this.renderFilterControls(filterContainer, childId);
+
+        const allTxs = this.state.transactions.filter(tx => tx.accountId === childId);
+        const filter = this.state.currentLogin.filter;
+        
+        const filteredTxs = allTxs.filter(tx => {
+            if (!filter || filter.mode === 'all') return true;
+            const txDate = new Date(tx.date);
+            if (filter.mode === 'year') return filter.year && txDate.getFullYear() === filter.year;
+            if (filter.mode === 'month') return filter.year && filter.month && txDate.getFullYear() === filter.year && (txDate.getMonth() + 1) === filter.month;
+            return true;
+        }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        summaryContainer.innerHTML = '';
+        if (filteredTxs.length > 0 || filter.mode !== 'all') {
+            const totalIncome = filteredTxs.filter(t=>t.amount > 0).reduce((s,t)=>s+t.amount, 0);
+            const totalExpense = filteredTxs.filter(t=>t.amount < 0).reduce((s,t)=>s+t.amount, 0);
+            const summaryTitle = filter.mode === 'all' ? '全部記錄總結' : '時段總結';
+            summaryContainer.innerHTML = `
+                <div class="summary-box">
+                    <h4>${summaryTitle}</h4>
+                    <div class="details">
+                        <span class="income">總增加: $${totalIncome.toFixed(2)}</span>
+                        <span class="expense">總扣減: $${Math.abs(totalExpense).toFixed(2)}</span>
+                    </div>
+                </div>`;
+        }
+        
+        listDiv.innerHTML = '';
+        if (filteredTxs.length > 0) {
+            filteredTxs.forEach(tx => listDiv.appendChild(this.createTransactionItem(tx, mode)));
+        } else {
+            listDiv.innerHTML = '<p style="text-align:center;">此期間沒有記錄。</p>';
+        }
+    },
+    
+    // --- 帳戶與交易處理 ---
+    getAccount(accountId) { return this.state.accounts.find(acc => acc.id === accountId); },
+
+    createAccount(role) {
+        const isParent = role === 'parent';
+        const nameInput = document.getElementById(isParent ? 'parent-name' : 'child-name');
+        const passInput = document.getElementById(isParent ? 'parent-password-setup' : 'child-password');
+        if (!nameInput.value || !passInput.value) { alert('姓名和密碼不能為空！'); return; }
+        this.state.accounts.push({ id: Date.now(), name: nameInput.value, password: passInput.value, role });
+        this.saveData();
+        alert(`${isParent ? '家長' : '小朋友'}帳戶 "${nameInput.value}" 已建立！`);
+        nameInput.value = ''; passInput.value = '';
+        if (isParent) this.renderAdminView();
+        else this.renderParentView(this.state.currentLogin.accountId);
+    },
+
+    deleteAccount(accountId) {
+        if (!confirm('確定要刪除此帳戶嗎？其相關交易記錄也會被刪除！')) return;
+        const accountToDelete = this.getAccount(accountId);
+        this.state.accounts = this.state.accounts.filter(acc => acc.id !== accountId);
+        if (accountToDelete && accountToDelete.role === 'child') this.state.transactions = this.state.transactions.filter(tx => tx.accountId !== accountId);
+        this.saveData();
+        alert('帳戶已刪除。');
+        if (this.state.currentLogin.type === 'admin') this.renderAdminView();
+        if (this.state.currentLogin.type === 'parent') this.renderParentView(this.state.currentLogin.accountId);
+    },
+    
+    createTransactionItem(tx, mode) {
+        const item = this.createEle('div', { className: `transaction-item ${tx.amount > 0 ? 'income' : 'expense'}` });
+        const dateStr = new Date(tx.date).toISOString().split('T')[0];
+        const creator = this.getAccount(tx.createdBy);
+        const creatorName = creator ? creator.name : '系統';
+        let actionsHTML = '';
+        if (mode === 'parent') {
+            actionsHTML = `<div class="actions"><button class="edit" onclick="app.editTransaction(${tx.id})">編輯</button><button class="danger" onclick="app.deleteTransaction(${tx.id})">刪除</button></div>`;
+        }
+        item.innerHTML = `
+            <div class="details">
+                <strong>${tx.description}</strong>
+                <small style="color: #aaa;">${dateStr}</small>
+                <small style="color: #ccc; font-style: italic;">由 ${creatorName} 新增/領取</small>
+            </div>
+            <div class="side-info">
+                 <div class="amount">${tx.amount > 0 ? '+' : ''}${tx.amount.toFixed(2)}</div>
+                 ${actionsHTML}
+            </div>`;
+        return item;
+    },
+
+    showTransactionModal(type, txId = null) {
+        const tx = txId ? this.state.transactions.find(t => t.id === txId) : null;
+        document.getElementById('tx-id-to-edit').value = tx ? tx.id : '';
+        document.getElementById('tx-type').value = type;
+        const modal = document.getElementById('transaction-modal');
+        const title = document.getElementById('modal-title');
+        title.innerText = tx ? "編輯事項" : (type === 'income' ? "增加零用錢事項" : "扣減零用錢事項");
+        title.style.color = (type === 'income') ? 'var(--success-color)' : 'var(--danger-color)';
+        const dateInput = document.getElementById('tx-date');
+        const dateToSet = tx ? new Date(tx.date) : new Date();
+        dateInput.value = dateToSet.toISOString().split('T')[0];
+        document.getElementById('tx-description').value = tx ? tx.description : '';
+        document.getElementById('tx-amount').value = tx ? Math.abs(tx.amount) : '';
+        modal.classList.remove('hidden');
+    },
+
+    closeTransactionModal() {
+        document.getElementById('transaction-modal').classList.add('hidden');
+    },
+
+    editTransaction(txId) {
+        const tx = this.state.transactions.find(t => t.id === txId);
+        if (tx) this.showTransactionModal(tx.amount >= 0 ? 'income' : 'expense', txId);
+    },
+
+    saveTransaction() {
+        const description = document.getElementById('tx-description').value;
+        let amount = parseFloat(document.getElementById('tx-amount').value);
+        const type = document.getElementById('tx-type').value;
+        const editId = parseInt(document.getElementById('tx-id-to-edit').value);
+        const childId = this.state.currentLogin.viewingChildId;
+        const dateValue = document.getElementById('tx-date').value;
+        if (!description || isNaN(amount) || !childId || !dateValue) { alert('請填寫完整資料並選擇一位小朋友！'); return; }
+        const transactionDate = new Date(dateValue);
+        const now = new Date();
+        transactionDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+        if (type === 'expense' && amount > 0) amount = -amount;
+        const recordTimestamp = new Date().toISOString();
+        if (editId) {
+            const txIndex = this.state.transactions.findIndex(t => t.id === editId);
+            if (txIndex > -1) {
+                Object.assign(this.state.transactions[txIndex], { description, amount, date: transactionDate.toISOString(), recordTimestamp });
+            }
+        } else {
+            this.state.transactions.push({ 
+                id: Date.now(), accountId: childId, description, amount, 
+                date: transactionDate.toISOString(), 
+                createdBy: this.state.currentLogin.accountId,
+                recordTimestamp
+            });
+        }
+        this.saveData();
+        this.renderTransactionView('parent', childId);
+        this.closeTransactionModal();
+    },
+
+    deleteTransaction(txId) {
+        if (!confirm('確定要刪除這筆記錄嗎？')) return;
+        this.state.transactions = this.state.transactions.filter(tx => tx.id !== txId);
+        this.saveData();
+        this.renderTransactionView('parent', this.state.currentLogin.viewingChildId);
+    },
+
+    claimDailyAllowance() {
+        const childId = this.state.currentLogin.accountId;
+        if (this.hasClaimedToday(childId)) { alert('今天已經領取過零用錢了！'); return; }
+        this.state.transactions.push({ 
+            id: Date.now(), accountId: childId, description: '每日零用錢', 
+            amount: this.state.settings.dailyAllowance, date: new Date().toISOString(), 
+            type: 'allowance', createdBy: childId,
+            recordTimestamp: new Date().toISOString()
+        });
+        this.saveData();
+        alert(`成功領取 $${this.state.settings.dailyAllowance}!`);
+        this.renderChildView(childId);
+    },
+
+    hasClaimedToday(childId) {
+        const today = new Date().toISOString().slice(0, 10);
+        return this.state.transactions.some(tx => tx.accountId === childId && tx.type === 'allowance' && tx.date.slice(0, 10) === today);
+    },
+
+    updateClaimButtonStatus(accountId) {
+        const btn = document.getElementById('claim-allowance-btn');
+        const claimed = this.hasClaimedToday(accountId);
+        btn.disabled = claimed;
+        btn.innerHTML = claimed ? '今天已領取' : `點擊領取今天 ($${this.state.settings.dailyAllowance}) 的零用錢`;
+    },
+    
+    // --- 系統設定與工具 ---
+    saveAdminSettings() {
+        const newPassword = document.getElementById('admin-password').value;
+        if (newPassword) this.state.settings.adminPassword = newPassword; 
+        const newAppName = document.getElementById('app-name-input').value;
+        if (newAppName) this.state.settings.appName = newAppName;
+        this.saveData();
+        this.renderAppName();
+        alert('管理員設定已儲存！');
+        document.getElementById('admin-password').value = '';
+    },
+
+    saveParentSettings() {
+        const newAllowance = parseFloat(document.getElementById('daily-allowance').value);
+        if (!isNaN(newAllowance)) this.state.settings.dailyAllowance = newAllowance; 
+        this.saveData();
+        alert('設定已儲存！');
+    },
+
+    resetAllData() {
+        if (!confirm('警告：這將會刪除所有帳戶、交易記錄和設定！確定嗎？')) return;
+        localStorage.removeItem('pocketMoneyDataV10');
+        this.loadData();
+        alert('所有數據已被清除。'); 
+        this.logout();
+    },
+
+    exportCSV() {
+        const childId = this.state.currentLogin.viewingChildId;
+        if (!childId) { alert("請先在『零用錢記錄管理』中選擇一位小朋友。"); return; }
+        const account = this.getAccount(childId);
+        const childTransactions = this.state.transactions.filter(tx => tx.accountId === childId).sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        let csvContent = "\uFEFF";
+        csvContent += "交易日期,項目,收入,支出,類型,操作者,記錄建立時間\n";
+        
+        childTransactions.forEach(tx => {
+            const d = new Date(tx.date);
+            const pad = (num) => String(num).padStart(2, '0');
+            const dateStr = `="${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}"`;
+            
+            const description = `"${tx.description.replace(/"/g, '""')}"`;
+            const income = tx.amount > 0 ? tx.amount.toFixed(2) : '';
+            const expense = tx.amount < 0 ? (-tx.amount).toFixed(2) : '';
+            const typeStr = tx.type === 'allowance' ? '零用錢' : '手動操作';
+            const creator = this.getAccount(tx.createdBy);
+            const creatorName = creator ? creator.name : '系統';
+            
+            let recordTimestampStr = '="N/A"';
+            if (tx.recordTimestamp) {
+                const d_rec = new Date(tx.recordTimestamp);
+                // FINAL FIX: Apply the formula trick to the timestamp as well
+                recordTimestampStr = `="${d_rec.getFullYear()}/${pad(d_rec.getMonth()+1)}/${pad(d_rec.getDate())} ${pad(d_rec.getHours())}:${pad(d_rec.getMinutes())}:${pad(d_rec.getSeconds())}"`;
+            }
+            
+            const row = [dateStr, description, income, expense, typeStr, creatorName, recordTimestampStr].join(',');
+            csvContent += row + "\n";
+        });
+
+        const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
+        const link = this.createEle("a", { href: encodedUri, download: `${account.name}_記錄.csv` });
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    },
+
+    importCSV(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target.result;
+                const rows = text.split('\n').slice(1);
+                let importedCount = 0;
+                rows.forEach(rowStr => {
+                    if (!rowStr) return;
+                    // Improved regex to handle quoted commas
+                    const cols = rowStr.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g).map(c => c.replace(/"/g, ''));
+                    if(cols.length < 6) return;
+                    
+                    const viewingChildId = this.state.currentLogin.viewingChildId;
+                    if (!viewingChildId) return;
+
+                    const amount = parseFloat(cols[2]) || -parseFloat(cols[3]) || 0;
+                    const creator = this.state.accounts.find(acc => acc.name === cols[5]);
+
+                    this.state.transactions.push({
+                        id: Date.now() + importedCount,
+                        accountId: viewingChildId,
+                        date: new Date(cols[0]).toISOString(),
+                        description: cols[1],
+                        amount: amount,
+                        type: cols[4] === '零用錢' ? 'allowance' : null,
+                        createdBy: creator ? creator.id : null,
+                        recordTimestamp: cols[6] ? new Date(cols[6]).toISOString() : new Date().toISOString()
+                    });
+                    importedCount++;
+                });
+                this.saveData();
+                alert(`成功導入 ${importedCount} 筆記錄！`);
+                this.renderTransactionView('parent', this.state.currentLogin.viewingChildId);
+            } catch (err) {
+                alert("導入失敗，請檢查 CSV 檔案格式。\n" + err);
+            } finally {
+                event.target.value = '';
+            }
+        };
+        reader.readAsText(file);
+    },
+
+    createEle(tag, attributes) {
+        const ele = document.createElement(tag);
+        for (const key in attributes) ele[key] = attributes[key];
+        return ele;
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => app.init());
+</script>
+</body>
+</html>
